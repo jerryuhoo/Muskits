@@ -3,17 +3,17 @@
 
 KIRITAN=/home/fangzhex/music/data/
 NO7SINGING=/home/fangzhex/music/data/
-ONIKU=/home/exx/jiatong/projects/svs/data/ONIKU_KURUMI_UTAGOE_DB
-OFUTON=/home/exx/jiatong/projects/svs/data/OFUTON_P_UTAGOE_DB
-OPENCPOP=/home/exx/jiatong/projects/svs/data/Opencpop
-NATSUME=/home/exx/jiatong/projects/svs/data/
-NIT_SONG070=/home/exx/jiatong/projects/svs/data/
-KISING=/home/exx/jiatong/projects/svs/data/KiSing
+ONIKU=/home/yyu479/svs/data/ONIKU_KURUMI_UTAGOE_DB
+OFUTON=/home/yyu479/svs/data/OFUTON_P_UTAGOE_DB
+OPENCPOP=/home/yyu479/svs/data/Opencpop
+NATSUME=/home/yyu479/svs/data/
+NIT_SONG070=/home/yyu479/svs/data/
+KISING=/home/yyu479/svs/data/KiSing
 NAMINE=/data4/zlt/datas/NAMINE_RITSU_UTAGOE_DB
 COMBINE=
 CSD=downloads
 ITAKO=
-POPCS=
+POPCS=/home/yyu479/svs/data/popcs
 
 # For only JHU environment
 if [[ "$(hostname -d)" == clsp.jhu.edu ]]; then
