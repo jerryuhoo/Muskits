@@ -1,4 +1,3 @@
-import warnings
 # from pretty_midi import PrettyMIDI
 # from visual_midi import Preset
 # from visual_midi import Plotter
@@ -11,32 +10,13 @@ import numpy as np
 import torch
 import os
 import soundfile as sf
-# download vocoder
-if not os.path.exists("/home/yyu479/svs/pretrained_models/pwg/"):
-    os.system("./utils/download_from_google_drive.sh \
-        https://drive.google.com/open?id=1khjnA7P-5gwmmeNsS21pgifYMnzCsIJx \
-        ~/svs/pretrained_models/pwg zip")
-
-    print("successfully finished download vocoder")
-else:
-    print("already downloaded pwg model")
-
-
+import librosa
+import logging
+from parallel_wavegan.utils import load_model
+import yaml
+from muskit.svs.feats_extract.log_mel_fbank import LogMelFbank
 from muskit.bin.svs_inference import SingingGenerate
-
-config_path = "/home/yyu479/svs/pretrained_models/opencpop_xiaoice_nodp_model/exp/xiaoice_nodp/config.yaml"
-model_path = "/home/yyu479/svs/pretrained_models/opencpop_xiaoice_nodp_model/exp/xiaoice_nodp/25epoch.pth"
-vocoder_config = "/home/yyu479/svs/pretrained_models/pwg/config.yml"
-vocoder_checkpoint = "/home/yyu479/svs/pretrained_models/pwg/checkpoint-250000steps.pkl"
-output_path = "/home/yyu479/svs/output/"
-print("start loading model!")
-sing_generation = SingingGenerate(
-    train_config=config_path,
-    model_file=model_path,
-    vocoder_config=vocoder_config,
-    vocoder_checkpoint=vocoder_checkpoint
-)
-print("load model successfully!")
+import warnings
 
 def read_label(label_str):
     line = label_str.strip().split()
@@ -59,6 +39,33 @@ def tensorify(batch):
     for key in batch:
         batch[key] = torch.tensor(batch[key])
     return batch
+
+
+# download vocoder
+if not os.path.exists("/home/yyu479/svs/pretrained_models/pwg/"):
+    os.system("./utils/download_from_google_drive.sh \
+        https://drive.google.com/open?id=1khjnA7P-5gwmmeNsS21pgifYMnzCsIJx \
+        ~/svs/pretrained_models/pwg zip")
+
+    print("successfully finished download vocoder")
+else:
+    print("already downloaded pwg model")
+
+config_path = "/home/yyu479/svs/pretrained_models/opencpop_xiaoice_nodp_model/exp/xiaoice_nodp/config.yaml"
+model_path = "/home/yyu479/svs/pretrained_models/opencpop_xiaoice_nodp_model/exp/xiaoice_nodp/25epoch.pth"
+vocoder_config = "/home/yyu479/svs/pretrained_models/pwg/config.yml"
+vocoder_checkpoint = "/home/yyu479/svs/pretrained_models/pwg/checkpoint-250000steps.pkl"
+output_path = "/home/yyu479/svs/output/"
+
+
+print("start loading model!")
+sing_generation = SingingGenerate(
+    train_config=config_path,
+    model_file=model_path,
+    vocoder_config=vocoder_config,
+    vocoder_checkpoint=vocoder_checkpoint
+)
+print("load model successfully!")
 
 
 warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -100,4 +107,58 @@ for index, row in egs.iterrows():
     # plt.show()
     if not os.path.exists(output_path):
         os.mkdir(output_path)
-    sf.write(output_path + str(row["id"]) + '.wav', singing, sing_generation.fs, subtype='PCM_24')
+    sf.write(output_path + str(row["id"]) + '.wav',
+             singing, sing_generation.fs, subtype='PCM_24')
+
+# ground truth to vocoder
+
+gt_name = "2001000001"
+gt_input_path = "/home/yyu479/svs/data/Opencpop/segments/wavs/" + gt_name + ".wav"
+SAMPLE_RATE = 24000
+gt_data, gt_samplerate = librosa.load(gt_input_path, sr=SAMPLE_RATE)
+print("sample rate:", gt_samplerate)
+print("input wav len:", len(gt_data))
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+gt_data_tensor = torch.tensor(gt_data, device=device).float()
+
+with open(vocoder_config) as f:
+    config = yaml.load(f, Loader=yaml.Loader)
+model_vocoder = load_model(vocoder_checkpoint, config)
+logging.info(f"Loaded model parameters from {vocoder_checkpoint}.")
+# if options.normalize_before:
+# if True:
+#     assert hasattr(model_vocoder, "mean"), "Feature stats are not registered."
+#     assert hasattr(model_vocoder, "scale"), "Feature stats are not registered."
+
+model_vocoder.remove_weight_norm()
+model_vocoder = model_vocoder.eval().to(device)
+
+# hop_length: 300
+# n_fft: 2048
+# win_length: 1200
+logMelFbank = LogMelFbank(
+    fs=SAMPLE_RATE,
+    hop_length=300,
+    n_fft=2048,
+    win_length=1200
+)
+gt_data_tensor = torch.unsqueeze(gt_data_tensor, 0)
+print("gt_data_tensor shape", gt_data_tensor.shape)
+mel = logMelFbank.forward(gt_data_tensor.cpu())[0]
+mel = mel.to(device)
+mel = mel.squeeze()
+print("mel shape", mel.shape)
+
+wav_true = (
+    model_vocoder.inference(mel, normalize_before=True).view(-1)
+)
+print("wav_true shape", wav_true.shape)
+
+sf.write(
+    os.path.join(output_path, "{}_true.wav".format(gt_name)),
+    wav_true.cpu().detach().numpy(),
+    SAMPLE_RATE,  # args.sampling_rate
+    format="wav",
+    subtype="PCM_24",
+)
+print("output gt wav after vocoder")
