@@ -97,7 +97,7 @@ inference_model=valid.loss.best.pth # Model path for decoding.
                                    # inference_model=3epoch.pth
                                    # inference_model=valid.acc.best.pth
                                    # inference_model=valid.loss.ave.pth
-vocoder_file=none  # Vocoder parameter file, If set to none, Griffin-Lim will be used.
+vocoder_file="/home/yyu479/svs/pretrained_models/pwg/checkpoint-250000steps.pkl"  # Vocoder parameter file, If set to none, Griffin-Lim will be used.
 download_model=""   # Download a model from Model Zoo and use it for decoding.
 
 # [Task dependent] Set the datadir name created by local/data.sh
